@@ -1,0 +1,727 @@
+---
+title: "Tracking the High: Identifying the Best Biomarkers of Recent Marijuana Use"
+author: "Derek Wen, Kaushika Uppu, and Siddhant Joshi"
+output: 
+  html_document:
+    theme: united
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+# control global Rmd chunk settings
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+## Introduction
+
+As marijuana use is being decriminalized in U.S. states, many are turning their attention to the potential legal and public health challenges this could pose for governments across the country. One such focus is on that of driving under the influence of drugs (DUID). With an increasing prevalence of consumption, it is reasonable to expect the possibility of impaired driving to increase as well, creating riskier roads. According to survey data from the National Roadside Survey of Alcohol and Drug Use by ROSA P, not only did nationwide cannabis consumption increase by 25% from 2002 to 2015, but THC detection in drivers from 2007 to 2014 also increased by 48% [3]. To combat the issue, many states have set *per se* laws that penalize drivers "if THC is detected at or above a pre-determined cutoff" [5]. However, defining a suitable cutoff is a complex problem. Variables such as methods of ingestion or frequency of use can have a dramatic impact on both cannabinoid levels within the body and how impaired someone who recently smoked becomes. Detecting recent use in drivers is necessary to ensure road safety, so defining an optimal method to test for the presence of debilitating-levels of marijuana in individuals would prove extremely useful [2][4]. Additionally, future legislation can be well-informed by scientific reasoning and analysis rather than seemingly arbitrary regulations.
+
+In this case study, we provide a comprehensive analysis that not only identifies the most effective biomarker(s) for determining recent marijuana use, but also considers practical applications and limitations. We will analyze various biomarkers associated with marijuana use (THC, CBN, CBD, etc.) across many biological matrices (blood, breath, and oral fluid) to determine which compound, in which matrix, and at what cutoff level serves as the best indicator of recent use. In this context, we define "best" as the compound that is most selective. In the event of a tie between compounds for *best*, we opt to favor the cutoffs that favor the true positive rate, that is, a bias toward detecting impairment levels, as we believe it to be more important to identify and remove potentially impaired drivers from the road. The results from this analysis would be practical in contexts such as law enforcement and medical diagnostics, where accurate and timely detection is a matter of public and individual safety.
+
+### Load packages
+
+```{r load-packages, message=FALSE}
+library(knitr)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(purrr)
+#install.packages('rstatix')
+#install.packages('cowplot')
+#install.packages('janitor')
+library(rstatix)
+library(cowplot)
+library(janitor)
+source("src/cs01_functions.R")
+```
+
+## Questions
+
+1.  Which compound, in which matrix, and at what cutoff is the best biomarker of recent use (3 hours since initial use)?
+2.  Is 3 hours after initial usage a good benchmark for "recent use?"
+
+## The Data
+
+Our study utilizes three datasets representing measurements of different compounds (CBN, CBD, THC, etc.) in the matrices of blood, breath, and oral fluid samples from subjects. The subjects were categorized as occasional users or frequent users and were then randomly administered one of three treatments of cannabis consumption: low dose (5.9% THC), high dose (13.4% THC) and a placebo (0.0% THC). Each dataset includes measurements taken at various time points relative to the time the treatment was administered. Since our definition of recent use is within 3 hours of consumption, our analyses will focus on data within 0 to 180 minutes from the start time.
+
+### Data Import
+
+To begin, we imported the blood, breath, and oral fluid data collected from the study.
+
+```{r}
+blood_data <- read_csv("data/Blood.csv")
+breath_data <- read_csv("data/Breath.csv")
+of_data <- read_csv("data/OF.csv")
+```
+
+## Data Wrangling
+
+With the data properly imported, we wrangle our data to be able to move forward with our analysis.
+
+### Re-factoring and Re-leveling
+
+We first re-coded and re-leveled the factors in `Treatment` so that more usable information is stored within the column. We also re-coded `Group` in order to make the labels easier to read. Finally, we cleaned up and standardized the column names, as well as renaming compound names for enhanced readability.
+
+```{r}
+# Implementing changes on whole blood data
+blood_data <- blood_data |> 
+  mutate(Treatment = fct_recode(Treatment, 
+                                "5.9% THC (low dose)" = "5.90%",
+                                "13.4% THC (high dose)" = "13.40%"),
+         Treatment = fct_relevel(Treatment, "Placebo", "5.9% THC (low dose)"),
+         Group = fct_recode(Group, 
+                            "Not experienced user" = "Occasional user",
+                            "Experienced user" = "Frequent user")) |> 
+  janitor::clean_names() |>
+  rename(thcoh = x11_oh_thc,
+         thccooh = thc_cooh,
+         thccooh_gluc = thc_cooh_gluc,
+         thcv = thc_v)
+
+# Implementing changes on breath data
+breath_data <- breath_data |> 
+  mutate(Treatment = fct_recode(Treatment, 
+                                "5.9% THC (low dose)" = "5.90%",
+                                "13.4% THC (high dose)" = "13.40%"),
+         Treatment = fct_relevel(Treatment, "Placebo", "5.9% THC (low dose)"),
+         Group = fct_recode(Group, 
+                            "Not experienced user" = "Occasional user",
+                            "Experienced user" = "Frequent user")) |> 
+  janitor::clean_names() |> 
+  rename(thc = thc_pg_pad)
+
+# Implementing changes on oral fluid data
+of_data <- of_data |>
+  mutate(Treatment = fct_recode(Treatment, 
+                                "5.9% THC (low dose)" = "5.90%",
+                                "13.4% THC (high dose)" = "13.40%"),
+         Treatment = fct_relevel(Treatment, "Placebo", "5.9% THC (low dose)"),
+         Group = fct_recode(Group, 
+                            "Not experienced user" = "Occasional user",
+                            "Experienced user" = "Frequent user")) |>  
+  janitor::clean_names() |>
+  rename(thcoh = x11_oh_thc,
+         thcv = thc_v)
+```
+
+### Compounds and Timepoints
+
+Next, we re-defined the compounds and timepoints for each matrix. These changes will be necessary for functions later on to make the data more readable when it comes to creating plots.
+
+```{r}
+# COMPOUNDS
+
+# Whole blood
+compounds_WB <-  as.list(colnames(Filter(function(x) !all(is.na(x)), blood_data[6:13])))
+
+# Breath
+compounds_BR <-  as.list(colnames(Filter(function(x) !all(is.na(x)), breath_data[6])))
+
+# Oral fluid
+compounds_OF <-  as.list(colnames(Filter(function(x) !all(is.na(x)), of_data[6:12])))
+
+
+# TIMEPOINTS
+
+# Whole blood
+timepoints_WB = tibble(start = c(-400, 0, 30, 70, 100, 180, 210, 240, 270, 300), 
+                       stop = c(0, 30, 70, 100, 180, 210, 240, 270, 300, max(blood_data$time_from_start, na.rm = TRUE)), 
+                       timepoint = c("pre-smoking","0-30 min","31-70 min",
+                                     "71-100 min","101-180 min","181-210 min",
+                                     "211-240 min","241-270 min",
+                                     "271-300 min", "301+ min") )
+
+# Breath
+timepoints_BR = tibble(start = c(-400, 0, 40, 90, 180, 210, 240, 270), 
+                       stop = c(0, 40, 90, 180, 210, 240, 270, 
+                                max(breath_data$time_from_start, na.rm = TRUE)), 
+                       timepoint = c("pre-smoking","0-40 min","41-90 min",
+                                     "91-180 min", "181-210 min", "211-240 min",
+                                     "241-270 min", "271+ min"))
+
+# Oral fluid
+timepoints_OF = tibble(start = c(-400, 0, 30, 90, 180, 210, 240, 270), 
+                       stop = c(0, 30, 90, 180, 210, 240, 270, 
+                                max(of_data$time_from_start, na.rm = TRUE)), 
+                       timepoint = c("pre-smoking","0-30 min","31-90 min",
+                                     "91-180 min", "181-210 min", "211-240 min",
+                                     "241-270 min", "271+ min"))
+```
+
+We define a function `assign_timepoint` to assign timepoints for each row into a new column `timepoint_use`, and then re-leveled that column so that the order of the timepoints are from beginning to end. The function is located in the supplemental .R file, but we apply it to the data below.
+
+```{r}
+# Whole blood
+ blood_data <- blood_data |> 
+  mutate(timepoint_use = map_chr(time_from_start, 
+                                 assign_timepoint, 
+                                 timepoints=timepoints_WB),
+         timepoint_use = fct_relevel(timepoint_use, timepoints_WB$timepoint))
+
+# Breath
+breath_data <- breath_data |> 
+  mutate(timepoint_use = map_chr(time_from_start, 
+                                 assign_timepoint, 
+                                 timepoints=timepoints_BR),
+         timepoint_use = fct_relevel(timepoint_use, timepoints_BR$timepoint))
+
+# Oral fluid
+of_data <- of_data |> 
+  mutate(timepoint_use = map_chr(time_from_start, 
+                                 assign_timepoint, 
+                                 timepoints=timepoints_OF),
+         timepoint_use = fct_relevel(timepoint_use, timepoints_OF$timepoint))
+```
+
+### Dropping Duplicates
+
+Finally, we define a `drop_dups` function to drop duplicate entries for a given subject within the same timepoint. Within a given time window for a subject, there may be multiple compound measurements. Since this varies across subjects and can skew the data, we opted to keep the earliest measurement within a time window and drop all other measurements taken in the same window.
+
+```{r}
+WB_dups <- drop_dups(blood_data)
+BR_dups <- drop_dups(breath_data)
+OF_dups <- drop_dups(of_data)
+```
+
+A glance at the cleaned data:
+
+```{r}
+kable(head(WB_dups), caption = 'Cleaned WB data')
+kable(head(BR_dups), caption = 'Cleaned BR data')
+kable(head(OF_dups), caption = 'Cleaned OF data')
+
+```
+
+## Exploratory Data Analysis
+
+In order to consider all matrices at once for some more insightful EDA plots, we will create `df_full` to combine the three datasets into a single, long data frame.
+
+```{r}
+
+# Creating df_full to consider all matrices at once
+
+WB_long <- WB_dups |> 
+  pivot_longer(6:13) |>
+  rename("fluid"="fluid_type")
+OF_long <- OF_dups |> pivot_longer(6:12)
+BR_long <- BR_dups |> pivot_longer(6)
+
+df_full <- bind_rows(WB_long, OF_long, BR_long)
+
+# Glance at df_full
+kable(head(df_full), caption = 'A glance at df_full')
+
+```
+
+### A Glance at the Compounds
+
+We will now examine the distribution of compound levels across all the matrices. The histograms below provide some insight into what can be considered "normal" levels of certain chemicals, which can prove useful in validating further analysis.
+
+```{r fig.width = 15, fig.height = 10}
+df_full |>
+  mutate(group_compound=paste0(fluid,": ", name)) |>
+
+ggplot(aes(x = value)) + 
+  geom_histogram() + 
+  facet_wrap(~group_compound, scales = "free") +
+  labs(
+    caption = 'Fig. 1'
+  )
+```
+
+We notice that THCCOOH, THCCOOH-gluc, and THC-OH seem to have the most variability in their levels overtime, a feature which may be undesirable in the context of accurately predicting recent use based on compound presence in one's system.
+
+### Overview of THC
+
+Given that many of the current laws in place for assessing DUIDs utilize THC levels as a key factor in determining recent use, we decided that further examining THC would be a good place to start [1]. These plots show the persistence of THC within the three matrices. The plots group by `treatment` and `group`, allowing us to better visualize the differences in the trends of THC presence in all possible treatment-group pairings afforded by the data.
+
+```{r}
+
+ggplot(data = BR_dups, aes(y = thc, x = timepoint_use)) + 
+  geom_jitter() + 
+  facet_grid(group ~ treatment) +
+  theme(axis.text.x = element_text(angle = 45))
+
+ggplot(data = OF_dups, aes(y = thc, x = timepoint_use)) + 
+  geom_jitter() + 
+  facet_grid(group ~ treatment) +
+  theme(axis.text.x = element_text(angle = 45))
+
+ggplot(data = WB_dups, aes(y = thc, x = timepoint_use)) + 
+  geom_jitter() + 
+  facet_grid(group ~ treatment) +
+  theme(axis.text.x = element_text(angle = 45))
+
+```
+
+Since there doesn't seem to be much of a difference between whether a subject was an experienced user or an inexperienced one, we will lump the two groups into one and treat them as a single sample in later analyses.
+
+### Correlations Between Compounds
+
+The following pairplot is important for visually exploring correlations and any other relationships between various compounds in whole blood. With it, we can quickly identify patterns, outliers, and potential relationships, involving every compound examined in the study. For example, there are some strong correlations between blood-CBN and blood-THC levels whereas blood-CBD and blood-THC levels seem extremely uncorrelated with one another.
+
+```{r}
+pairs(WB_dups[, unlist(compounds_WB)], 
+      pch = 19, 
+      cex = 0.3, 
+      cex.labels = 0.6,
+      labels = gsub('THC', 'THC', gsub("_", "-", toupper(colnames(WB_dups[, unlist(compounds_WB)])))))
+```
+
+### Treatment-Based Differences
+
+These boxplots capture THC levels in blood, categorized by different treatments. It highlights how THC concentrations vary between participants who were given the placebo, a low-dose, and a high-dose, while also providing a check that participants given a placebo did not have significant levels of THC.
+
+```{r fig.width = 10}
+df_full |> 
+  filter(name=="thc", timepoint=="T2A") |>
+  ggplot(aes(x=treatment, y=value)) + 
+  geom_boxplot() +
+  facet_wrap(~fluid, scales="free")
+```
+
+### Patterns in Metabolism
+
+The graphs below show the trends of various compounds over time in each of the three matrices, providing insights into how these compounds metabolize and persist after initial consumption. We plotted the median compound amount for each timepoint as it would be more robust to outliers and provide a better picture of the overall trend.
+
+```{r}
+# Pivot the WB_dups data to long format for all compounds
+WB_long <- WB_dups %>%
+  pivot_longer(cols = cbn:thcv, names_to = "compound", values_to = "value") 
+
+# Calculate median values for each compound at each timepoint
+WB_medians <- WB_long %>%
+  group_by(timepoint_use, compound) %>%
+  summarize(median_value = median(value, na.rm = TRUE), .groups = 'drop')
+
+# Create line plot for all compounds
+ggplot(WB_medians, aes(x = timepoint_use, y = median_value, color = compound, group = compound)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Median Compound Values Over Time in Whole Blood", 
+       x = "Timepoint", y = "Median Compound Level") +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Pivot the BR_dups data to long format for all compounds
+BR_long <- BR_dups %>%
+  pivot_longer(cols = thc, names_to = "compound", values_to = "value")
+
+# Calculate median values for each compound at each timepoint
+BR_medians <- BR_long %>%
+  group_by(timepoint_use, compound) %>%
+  summarize(median_value = median(value, na.rm = TRUE), .groups = 'drop')
+
+# Create line plot for all compounds
+ggplot(BR_medians, aes(x = timepoint_use, y = median_value, color = compound, group = compound)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Median Compound Values Over Time in Breath", 
+       x = "Timepoint", y = "Median Compound Level") +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Pivot the OF_dups data to long format for all compounds
+OF_long <- OF_dups %>%
+  pivot_longer(cols = cbn:thca_a, names_to = "compound", values_to = "value")
+
+# Calculate median values for each compound at each timepoint
+OF_medians <- OF_long %>%
+  group_by(timepoint_use, compound) %>%
+  summarize(median_value = median(value, na.rm = TRUE), .groups = 'drop')
+
+# Create line plot for all compounds
+ggplot(OF_medians, aes(x = timepoint_use, y = median_value, color = compound, group = compound)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Median Compound Values Over Time in Oral Fluid", 
+       x = "Timepoint", y = "Median Compound Level") +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Data Analysis
+
+To get a good picture of a compound's selectiveness in detecting recent use, we will take advantage of sensitivity and specificity of each compound at various cut-offs. For the purposes of this analysis, error metrics will be defined as follows:
+
+| Error Metric   | Pre-smoking      | Post-smoking (cutoff \> 0)         | Post-smoking (cutoff == 0)        |
+|:---------------|:---------------- |:----------------                   |:----------------                  |
+| True Positive  | 0                | Received THC, value \>= cutoff     | Received THC, value \> cutoff     |
+| False Positive | value \>= cutoff | Received placebo, value \>= cutoff | Received placebo, value \> cutoff |
+| True Negative  | value \< cutoff  | Received placebo, value \< cutoff  | Received placebo, value \< cutoff |
+| False Negative | 0                | Received THC, value \< cutoff      | Received THC, value \< cutoff     |
+
+
+We also explore cutoffs at 0, 0.5, 1, 2, and 5 ng/mL to best capture the range in which current *per se* laws dictate as cutoff levels for the legal driving limit. When examining breath, we will utilize cutoffs at 0.5, 100, 500, 1000 as THC levels in breath are of higher order than in the other matrices. 
+
+### ROC Curves and Sensitivity/Specificity Analysis
+
+To get a first glance of general classification power over time, we generate ROC curves for each compound/matrix across each time window. The following chunk generates error metrics for each compound and plots an ROC curve with each curve representing a different time window.
+
+```{r}
+# Calculating error metrics for each compound, per matrix
+output_WB <- map_dfr(compounds_WB, 
+                     ~sens_spec_cpd(dataset = WB_dups, cpd = all_of(.x), 
+                                    timepoints = timepoints_WB)) %>% clean_gluc()
+
+output_BR <- map_dfr(compounds_BR, 
+                     ~sens_spec_cpd(dataset = BR_dups,  cpd = all_of(.x),
+                                    timepoints = timepoints_BR))  %>% clean_gluc()
+
+output_OF <- map_dfr(compounds_OF, 
+                     ~sens_spec_cpd(dataset = OF_dups, cpd = all_of(.x),
+                                    timepoints = timepoints_OF))  %>% clean_gluc()
+```
+
+
+```{r results = "hide", fig.keep = "none"}
+
+# Generating the sens/spec curves
+ss1_a <- ss_plot(output_WB, tpts = length(unique(output_WB$time_start)), tissue = "Blood");
+ss2_a <- ss_plot(output_OF, tpts = length(unique(output_OF$time_start)), tissue = "Oral Fluid");
+ss3_a <- roc_plot(output_BR, tpts = length(unique(output_BR$time_start)), tissue = "Breath");
+```
+
+```{r fig.width = 15, fig.height = 7}
+# Viewing all the ROC curves on the same panel
+bottom_row <- plot_grid(ss2_a, ss3_a, labels = c('B', 'C'), label_size = 12, ncol = 2, rel_widths = c(0.66, .33))
+plot_grid(ss1_a, bottom_row, labels = c('A', ''), label_size = 12, ncol = 1)
+```
+
+From these ROC curves, we can eliminate any compounds with small values for true positive and true negative rates (i.e. the curve is bunched in the lower left corner of the graph). Such values would not be useful as distinguishing biomarkers, so we can ignore CBD and THCV in whole blood and 11-OH-THC in oral fluid for the remainder of the analysis.
+
+Before moving on to further analysis, we decide to conduct a pocket-EDA to visualize the sensitivity and specificity trends for some of the compounds and matrices to determine if there were any patterns/outlying measurements.
+
+The following chunk defines timepoints and cutoffs for the plots and downstream analysis:
+```{r fig.width = 10}
+
+# Defining the timepoints for the x-axis
+blood_levels <- c("pre-smoking\nN=189", "0-30\nmin\nN=187", "31-70\nmin\nN=165",
+                  "71-100\nmin\nN=157", "101-180\nmin\nN=168", "181-210\nmin\nN=103",
+                  "211-240\nmin\nN=127", "241-270\nmin\nN=137", "271-300\nmin\nN=120",
+                  "301+\nmin\nN=88")
+
+of_levels <- c("pre-smoking\nN=192", "0-30\nmin\nN=192", "31-90\nmin\nN=117",
+               "91-180\nmin\nN=99", "181-210\nmin\nN=102", "211-240\nmin\nN=83",
+               "241-270\nmin\nN=90",  "271+\nmin\nN=76")
+
+br_levels <- c("pre-smoking", "0-40 min","41-90 min",
+               "91-180 min", "181-210 min", "211-240 min",
+               "241-270 min", "271+ min")
+
+# Cutoff values for whole blood and oral fluid
+wbof_cutoffs = c(0, 0.5, 1, 2, 5)
+
+# Cutoff values for breath
+br_cutoffs = c(0, 0.5, 100, 500, 1000)
+
+```
+
+Generating the plots
+
+```{r fig.width = 10, results = "hide"}
+
+
+WB_THC <- sens_spec_cpd(dataset = WB_dups, cpd = 'thc',
+                        timepoints = timepoints_WB,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_CBN <- sens_spec_cpd(dataset = OF_dups, cpd = 'cbn',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+BR_THC <- sens_spec_cpd(dataset = BR_dups, cpd = 'thc',
+                        timepoints = timepoints_BR,
+                        splits = br_cutoffs) %>% clean_gluc()
+
+# Plotting the pairs of curves for the sens. and spec. at each cutoff
+plot_cutoffs(dataset = WB_THC, 
+             timepoint_use_variable = WB_dups$timepoint_use, 
+             tissue = "Blood", 
+             vertline = levels(WB_dups$timepoint_use)[5], 
+             cpd = "THC", 
+             x_labels = blood_levels)
+
+plot_cutoffs(dataset = BR_THC, 
+             timepoint_use_variable = BR_dups$timepoint_use, 
+             tissue = "Breath", 
+             vertline = levels(BR_dups$timepoint_use)[5], 
+             cpd = "THC", 
+             x_labels = br_levels)
+
+plot_cutoffs(dataset = OF_CBN,
+             timepoint_use_variable = OF_dups$timepoint_use,
+             tissue = "Oral Fluid",
+             labels = c("A", "B"),
+             vertline = levels(OF_dups$timepoint_use)[4],
+             cpd = "CBN",
+             x_labels = of_levels)
+```
+
+It seems that overall, the lower a cutoff, the higher the sensitivity and lower the specificity. Additionally, specificity measures seem to be close to 1 quite often, indicating excellent ability to avoid false positives. Regarding future analysis, this would mean we would favor lower cutoffs in the event of a tie between cutoffs for the "best" selectivity.
+
+
+### Leveraging the Youden Index
+
+After ruling out CBD, THCV, 11-OH-THC based on the ROC curves above, we will take a closer look into the sensitivity and specificity trade-off among the remaining compounds. We opted to utilize a Youden index as it provides a single summary measure that takes into account both sensitivity and specificity. This way, our decision criterion would be selecting the combination of matrix, compound, and cutoff that yields the highest index value.
+
+In the following chunks, we calculate the Youden index values for the average sensitivity and specificity scores over the 0 - 180 min time window for each compound-matrix combination. Once calculated, we select the cutoff-compound pairing that yields the highest Youden index value as the best for that matrix. 
+
+
+#### Oral Fluid
+Starting with oral fluid, we will consider the following compounds: THC, CBD, CBG, CBN, THCA-A, and THCV.
+
+```{r OF analysis}
+
+# Generating the error metrics for each compound in oral fluid
+OF_THC <- sens_spec_cpd(dataset = OF_dups, cpd = 'thc',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_CBD <- sens_spec_cpd(dataset = OF_dups, cpd = 'cbd',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_CBG <- sens_spec_cpd(dataset = OF_dups, cpd = 'cbg',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_CBN <- sens_spec_cpd(dataset = OF_dups, cpd = 'cbn',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_THCAA <- sens_spec_cpd(dataset = OF_dups, cpd = 'thca_a',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+OF_THCV <- sens_spec_cpd(dataset = OF_dups, cpd = 'thcv',
+                        timepoints = timepoints_OF,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+# Calculating the Youden index for each compound at each cutoff over 0 - 180 mins
+thc_j_of <- mean_youden(OF_THC, 180)
+cbd_j_of <- mean_youden(OF_CBD, 180)
+cbg_j_of <- mean_youden(OF_CBG, 180)
+cbn_j_of <- mean_youden(OF_CBN, 180)
+thcaa_j_of <- mean_youden(OF_THCAA, 180)
+thcv_j_of <- mean_youden(OF_THCV, 180)
+
+of_results <- rbind(thc_j_of, cbd_j_of, cbg_j_of, cbn_j_of, thcaa_j_of, thcv_j_of)
+
+# Graphically representing the results of the analysis
+ggplot(of_results, aes(x = detection_limit, y = youden, color = compound)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(
+    title = 'THC has the best selectivity at a 2 ng/mL cutoff in Oral Fluid',
+    subtitle = 'Youden indices for each compound in oral fluid over selected cutoffs from 0 - 180 mins',
+    x = 'Cut-off (ng/mL)',
+    y = 'Youden Index (J)',
+    color = 'Compound'
+  )
+
+# Determining best cutoff based on highest Youden index for THC
+thc_j_of |> 
+  filter(youden == max(youden))
+```
+
+According to the data and subsequent plot above, the compound with the highest Youden index in oral fluid is THC, at a cutoff of 2 ng/mL.
+
+#### Whole Blood
+For whole blood, we will consider the following compounds: THC, 11-OH-THC, CBG, and CBN.
+
+```{r WB analysis}
+
+# Generating the error metrics for each compound in whole blood
+WB_THC <- sens_spec_cpd(dataset = WB_dups, cpd = 'thc',
+                        timepoints = timepoints_WB,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+WB_OH_THC <- sens_spec_cpd(dataset = WB_dups, cpd = 'thcoh',
+                        timepoints = timepoints_WB,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+WB_CBG <- sens_spec_cpd(dataset = WB_dups, cpd = 'cbg',
+                        timepoints = timepoints_WB,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+WB_CBN <- sens_spec_cpd(dataset = WB_dups, cpd = 'cbn',
+                        timepoints = timepoints_WB,
+                        splits = wbof_cutoffs) %>% clean_gluc()
+
+# Calculating the Youden index for each compound at each cutoff over 0 - 180 mins
+thc_j_wb <- mean_youden(WB_THC, 180)
+thcoh_j_wb <- mean_youden(WB_OH_THC, 180)
+cbg_j_wb <- mean_youden(WB_CBG, 180)
+cbn_j_wb <- mean_youden(WB_CBN, 180)
+
+wb_results <- rbind(thc_j_wb, thcoh_j_wb, cbg_j_wb, cbn_j_wb)
+
+# Graphically representing the results of the analysis
+ggplot(wb_results, aes(x = detection_limit, y = youden, color = compound)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(
+    title = 'THC has the best selectivity at a 2 ng/mL cutoff in Blood',
+    subtitle = 'Youden indices for each compound in whole blood over selected cutoffs from 0 - 180 mins',
+    x = 'Cut-off (ng/mL)',
+    y = 'Youden Index (J)',
+    color = 'Compound'
+  )
+
+# Determining best cutoff based on highest Youden index for THC
+thc_j_wb |> 
+  filter(youden == max(youden))
+```
+
+For whole blood, the best biomarker for recent use is also THC at a cutoff of 2.0 ng/mL, as indicated by the data and above plot. 
+
+
+#### Breath
+
+```{r}
+
+# Generating the error metrics for THC in breath
+BR_THC <- sens_spec_cpd(dataset = BR_dups, cpd = 'thc',
+                        timepoints = timepoints_BR,
+                        splits = br_cutoffs) %>% clean_gluc()
+
+# Calculating the Youden index for THC at each cutoff
+br_results <- mean_youden(BR_THC, 180)
+
+
+# Graphically representing the results of the analysis
+ggplot(br_results, aes(x = detection_limit, y = youden)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(
+    title = 'THC has the best selectivity at a 0.5 ng/mL cutoff in Breath',
+    subtitle = 'Youden indices for THC in breath over selected cutoffs from 0 - 180 mins',
+    x = 'Cut-off (ng/mL)',
+    y = 'Youden Index (J)'
+  )
+
+# Determining best cutoff based on highest Youden index for THC
+br_results |> 
+  filter(youden == max(youden))
+
+```
+Finally, the best biomarker for recent use in breath is THC at a cutoff of 0.5 ng/mL, as indicated by the data and above plot. 
+
+
+## Analyzing "Recent Use"
+
+We also wanted to reassess the constraints of "recent use" in this study, as we have been using 3 hours as the temporal cutoff point. However, we were curious if a longer period of time would still be categorized as recent use and accurately detect substance use.
+
+As the sensitivity and specificity values were already calculated previously, we then found the mean Youden index value for each time period, starting at the 0-30 minutes timepoint, and going up to 301+ minutes timepoint. We focused on THC as our compound, as our previous analysis has shown that it is the best compound for prediction. We also used our previously determined "best" cutoff: 5 ng/ml for oral fluid and 2 ng/ml for whole blood.
+
+```{r}
+# Calculating Youden index for each time period for oral fluid, using 2 ng/ml as cutoff
+youden_tp_of <- ext_youden(OF_THC, 2)
+
+# Calculating Youden index for each time period for whole blood, using 2 ng/ml as cutoff
+youden_tp_wb <- ext_youden(WB_THC, 2)
+
+# Calculating Youden index for each time period for breath, using 0.5 ng/ml as cutoff
+youden_tp_br <- ext_youden(BR_THC, 0.5)
+
+kable(youden_tp_of)
+kable(youden_tp_wb)
+kable(youden_tp_br)
+```
+
+To better visualize these values, we plotted them across time periods for each matrix.
+
+```{r}
+# Re-leveling oral fluid time_window so that it is in chronological order
+youden_tp_of <- youden_tp_of |>
+  mutate(time_window = fct_relevel(time_window, "0-30 min", "31-90 min", "91-180 min", 
+                                   "181-210 min", "211-240 min", "241-270 min", "271+ min"))
+
+# Plotting Youden indices for oral fluid
+youden_tp_of |>
+  filter(time_window != "pre-smoking") |>
+    ggplot(mapping = aes(x = time_window, y = youden, group = 1)) +
+    geom_line(color = "#8da0cb") +
+    geom_point() +
+    labs(x = "Time Period", y = "Youden Index",
+         title = "Youden Indices Tend to Decrease As Time Increases from Start",
+         subtitle = "Youden Index Values Over Time in Oral Fluid") +
+    theme_minimal() +
+    theme(plot.title.position = "plot")
+
+
+# Re-leveling whole blood time_window so that it is in chronological order
+youden_tp_wb <- youden_tp_wb |>
+  mutate(time_window = fct_relevel(time_window, "0-30 min", "31-70 min", "71-100 min", "101-180 min", 
+                                   "181-210 min", "211-240 min", "241-270 min", "271-300 min", "301+ min"))
+
+# Plotting Youden indices for whole blood
+youden_tp_wb |>
+  filter(time_window != "pre-smoking") |>
+    ggplot(mapping = aes(x = time_window, y = youden, group = 1)) +
+    geom_line(color = "#8da0cb") +
+    geom_point() +
+    labs(x = "Time Period", y = "Youden Index",
+         title = "Youden Indices Tend to Decrease As Time Increases from Start",
+         subtitle = "Youden Index Values Over Time in Whole Blood") +
+    theme_minimal() +
+    theme(plot.title.position = "plot")
+
+
+# Re-leveling breath time_window so that it is in chronological order
+youden_tp_br <- youden_tp_br |>
+  mutate(time_window = fct_relevel(time_window, "pre-smoking", "0-40 min","41-90 min", "91-180 min",
+                                   "181-210 min", "211-240 min", "241-270 min", "271+ min"))
+
+# Plotting Youden indices for breath
+youden_tp_br |>
+  filter(time_window != "pre-smoking") |>
+    ggplot(mapping = aes(x = time_window, y = youden, group = 1)) +
+    geom_line(color = "#8da0cb") +
+    geom_point() +
+    labs(x = "Time Period", y = "Youden Index",
+         title = "Youden Indices Tend to Decrease As Time Increases from Start",
+         subtitle = "Youden Index Values Over Time in Breath") +
+    theme_minimal() +
+    theme(plot.title.position = "plot")
+
+```
+
+From the plots above, the highest Youden index is for the 0-30 minutes time period. This makes sense in the context of the study, as that would be the time frame that immediately follows the substance use, and therefore, would have high levels of THC to be easily detected. The general decrease in mean Youden index follows this logic, as time from substance use increases and THC levels decrease. Overall, based solely on the calculations and plots above, it appears that the best temporal cutoff to use would be 30 minutes. 
+
+However, we believe that this isn’t a fair conclusion. We cannot determine the “best” time cutoff for recent use, because the data we have does not include any information about the participants’ impairment while driving. Since the original time cutoff of 3 hours was determined on that basis, that the drivers were not showing significant signs of impairment after 3 hours since use, we think that trying to pinpoint a temporal cutoff without that information would likely not reveal the whole context of the situation, and would therefore not be accurate.
+
+In order to effectively analyze and revise the definition of “recent use,” we would first need to assess the impairment of the participants over time, which is currently a limitation of our data. 
+
+## Results
+
+  Upon calculating and comparing Youden indices for each matrix, we discovered that testing for at least 2.0 ng/mL of THC in oral fluid samples is the most selective method to classifying recent use (*J* = 0.839). THC was also optimal in whole blood (*J* = 0.546) and breath (*J* = 0.469), however they were not as comprehensive as THC from oral fluid, indicated by their lesser Youden indices. The optimal level in whole blood was also 2.0 ng/mL whereas in breath it was 0.5 ng/mL. When examining the error metrics in more depth, we see that utilizing a 2.0 ng/mL cutoff for THC in oral fluid yields an average sensitivity of 0.947 and specificity of 0.786. Additionally, when examining the Youden indices over the time windows in the study, there seems to be a general decreasing trend across all three matrices, indicating poorer test performance as time progressed. 
+
+
+## Conclusion
+
+  Through our study, we determined the cannabinoids best-suited for determining recent marijuana use and identified optimal cutoffs, beyond which a driver can be deemed to have smoked recently. We discovered that testing for at least 2.0 ng/mL of THC in oral fluid samples is the most selective method to classifying recent use. These results also have promising implications, as sampling oral fluid at roadside is not as elaborate as blood tests, and provides us with the best balance between an average true positive rate of 94.7% and true negative rate of 78.6%. 
+
+  In regards to the definition of "recent use", our results revealed that the time window from 0 - 30 minutes may be a better definition of recent use than the previous 0 - 180 min window. This makes sense, as the 0 - 30 minutes time frame immediately follows substance use and would therefore have the most *refined* THC levels and enhance predictive power. Additionally, since we are favoring sensitivity, the closer the time window is to the time of use, the higher the chances of catching true positives. However, we would like to stress that these data do not provide comprehensive evidence for the best cutoff, as degree of impairment on the road was not taken into consideration. The initial benchmark of 0 - 180 mins for recent use was preferred as it was the time after which driving habits were no longer impaired. The method we provide only aids in determining whether or not someone had smoked marijuana in the past 3 hours, not if they are impaired, as these are two related yet different measures. Further tests and driving simulation data would have to be collected in order to supplement the use of the methods established in our case study.
+
+
+## Reference
+
+[1] David M. Schwope, Wendy M. Bosker, Johannes G. Ramaekers, David A. Gorelick, Marilyn A. Huestis, Psychomotor Performance, Subjective and Physiological Effects and Whole Blood Δ9-Tetrahydrocannabinol Concentrations in Heavy, Chronic Cannabis Smokers Following Acute Smoked Cannabis, Journal of Analytical Toxicology, Volume 36, Issue 6, July 2012, Pages 405–412, https://doi.org/10.1093/jat/bks044
+
+[2] Rebecca L Hartman, Marilyn A Huestis, Cannabis Effects on Driving Skills, Clinical Chemistry, Volume 59, Issue 3, 1 March 2013, Pages 478–492, https://doi.org/10.1373/clinchem.2012.194381
+
+[3] "Results of the 2007 National Roadside Survey of Alcohol and Drug Use by Drivers [Traffic Safety Facts]" , 2009, <https://doi.org/10.21949/1525704>
+
+[4] Robert L Fitzgerald, Anya Umlauf, Jacqueline A Hubbard, Melissa A Hoffman, Philip M Sobolesky, Shannon E Ellis, David J Grelotti, Raymond T Suhandynata, Marilyn A Huestis, Igor Grant, Thomas D Marcotte, Driving Under the Influence of Cannabis: Impact of Combining Toxicology Testing with Field Sobriety Tests, Clinical Chemistry, Volume 69, Issue 7, July 2023, Pages 724–733, https://doi.org/10.1093/clinchem/hvad054
+
+[5] Thomas R. Arkell, Tory R. Spindle, Richard C. Kevin, Ryan Vandrey & Iain S. McGregor (2021) The failings of per se limits to detect cannabis-induced driving impairment: Results from a simulated driving study, Traffic Injury Prevention, 22:2, 102-107, DOI: 10.1080/15389588.2020.1851685
+
