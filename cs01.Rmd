@@ -2,8 +2,7 @@
 title: "Tracking the High: Identifying the Best Biomarkers of Recent Marijuana Use"
 author: "Derek Wen, Kaushika Uppu, and Siddhant Joshi"
 output: 
-  html_document:
-    keep_md: true
+  rmarkdown::github_document:
     theme: united
     toc: true
     toc_float: true
