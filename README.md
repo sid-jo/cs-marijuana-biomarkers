@@ -17,9 +17,9 @@ As marijuana use becomes increasingly decriminalized across the U.S., addressing
 - **Statistical Modeling:** rstatix
 
 ## Objectives  
-1. Analyze various cannabinoids (e.g., THC, CBN, CBD) across biological matrices (blood, breath, oral fluid) to determine the most selective biomarkers for detecting recent marijuana use.
+1. Analyze various cannabinoids across biological matrices (blood, breath, oral fluid) to determine the most selective biomarkers for detecting recent marijuana use.
 3. Define appropriate cutoff levels for biomarkers that strike the balance between maximizing road safety and minimizing wrongful convictions.
-4. Generate scientifically grounded insights to guide the development of fair laws related to driving under the influence of drugs (DUID).
+4. Generate scientifically grounded insights to guide the development of fair laws related to DUIDs.
 
 ## Results and Discussion  
 - Identified biomarkers with strong statistical significance in distinguishing recent marijuana use
