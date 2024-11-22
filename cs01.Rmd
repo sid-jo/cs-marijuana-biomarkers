@@ -3,6 +3,7 @@ title: "Tracking the High: Identifying the Best Biomarkers of Recent Marijuana U
 author: "Derek Wen, Kaushika Uppu, and Siddhant Joshi"
 output: 
   html_document:
+    keep_md: true
     theme: united
     toc: true
     toc_float: true
