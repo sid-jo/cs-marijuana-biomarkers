@@ -1,7 +1,7 @@
 # Tracking the High: Identifying the Best Biomarkers of Recent Marijuana Use
 
 ## Overview
-As marijuana use becomes increasingly decriminalized across the U.S., addressing the legal and public health challenges, particularly driving under the influence of drugs (DUID), is critical for road safety. This project seeks to provide a comprehensive analysis of biomarkers for recent marijuana use to inform scientifically-grounded detection methods. By examining various cannabinoids (e.g., THC, CBN, CBD, etc.) across biological matrices such as blood, breath, and oral fluid, the study aims to identify the most effective biomarker and optimal cutoff levels for detecting recent use.
+As marijuana use becomes increasingly decriminalized across the U.S., addressing the legal and public health challenges, particularly driving under the influence of drugs (DUID), is critical for road safety. This project seeks to provide a comprehensive analysis of biomarkers for recent marijuana use to inform scientifically-grounded detection methods. By examining various cannabinoids (e.g. THC, CBN, CBD, etc.) across biological matrices such as blood, breath, and oral fluid, the study aims to identify the most effective biomarker and optimal cutoff levels for detecting recent use.
 
 ## Key Contributions
 **Exploratory Data Analysis:** Conducted data cleaning, visualization, and analysis using standard R packages. Examined different dimensions of the data from patient
