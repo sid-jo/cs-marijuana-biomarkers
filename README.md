@@ -1,37 +1,31 @@
 # Tracking the High: Identifying the Best Biomarkers of Recent Marijuana Use
 
-## Overview  
-This project explores the identification of effective biomarkers to track recent marijuana use. By analyzing 
-data from relevant studies, the work aims to uncover the most reliable indicators, providing insights into the 
-physiological and biochemical changes associated with marijuana consumption. The findings have applications in 
-medical diagnostics, substance use monitoring, and legal contexts.
+## Overview
+As marijuana use becomes increasingly decriminalized across the U.S., addressing the legal and public health challenges, particularly driving under the influence of drugs (DUID), is critical for road safety. This project seeks to provide a comprehensive analysis of biomarkers for recent marijuana use to inform scientifically-grounded detection methods. By examining various cannabinoids (e.g., THC, CBN, CBD, etc.) across biological matrices such as blood, breath, and oral fluid, the study aims to identify the most effective biomarker and optimal cutoff levels for detecting recent use.
 
-## Key Contributions  
-- **Exploratory Analysis:**  
-  Examined the relationships between various biomarkers and marijuana use through statistical and data-driven methods.  
-- **Feature Selection:**  
-  Employed advanced techniques to identify the most relevant biomarkers for distinguishing recent use.  
-- **Model Development:**  
-  Built predictive models to assess the efficacy of these biomarkers in classifying marijuana use within a specified timeframe.  
-- **Research Summary:**  
-  Documented findings in a comprehensive report, detailing methodologies, results, and future research directions.  
+## Key Contributions
+**Exploratory Data Analysis:** Conducted data cleaning, visualization, and analysis using standard R packages. Examined different dimensions of the data from patient
+
+**Data Analysis:** Employed advanced sensitivity/specificity analysis to identify the most relevant biomarkers for distinguishing recent use. Assessed the reliability of each combination of biomarkers, cutoffs, and matrices at various time windows from the study.
+
+**Research Summaries:** Documented findings in a comprehensive report, detailing methodologies, results, and future research directions. Created inforgraphic to summarize findings in an accessible format.
 
 ## Tools and Technologies  
-- **Programming:** Python  
-- **Data Analysis:** NumPy, Pandas  
-- **Data Visualization:** Matplotlib, Seaborn  
-- **Statistical Modeling:** Sci-Kit Learn  
+- **Programming:** R
+- **Data Analysis:** tidyverse (tidyr, dplyr)
+- **Data Visualization:** ggplot2, cowplot, Adobe Photoshop
+- **Statistical Modeling:** rstatix
 
 ## Objectives  
-1. To analyze physiological and biochemical data for potential biomarkers of recent marijuana use.  
-2. To develop and evaluate predictive models that effectively classify recent use.  
-3. To propose biomarkers that are both reliable and practical for real-world applications.  
+1. Analyze various cannabinoids (e.g., THC, CBN, CBD) across biological matrices (blood, breath, oral fluid) to determine the most selective biomarkers for detecting recent marijuana use.
+3. Define appropriate cutoff levels for biomarkers that strike the balance between maximizing road safety and minimizing wrongful convictions.
+4. Generate scientifically grounded insights to guide the development of fair laws related to driving under the influence of drugs (DUID).
 
 ## Results and Discussion  
-- Identified biomarkers with strong statistical significance in distinguishing recent marijuana use.  
-- Evaluated the performance of predictive models, achieving notable accuracy and reliability.  
-- Discussed limitations, including dataset scope and potential confounders, and suggested avenues for further research.  
+- Identified biomarkers with strong statistical significance in distinguishing recent marijuana use
+- Evaluated the performance of predictive models, achieving notable accuracy and reliability
+- Discussed limitations, including dataset scope and potential confounders, and suggested avenues for further research
 
-## Conclusion  
-This project highlights the potential of specific biomarkers to act as reliable indicators of recent marijuana use. 
-The findings provide a foundation for developing diagnostic tools and open pathways for further research in substance use analysis.
+## Conclusion
+This study provides a comprehensive analysis of biomarkers for recent marijuana use, identifying the most effective compounds and cutoff levels across various biological matrices. By prioritizing selectivity and emphasizing true positive detection, the findings aim to support the development of accurate and scientifically grounded methods for detecting impairment. These insights have practical applications in law enforcement and medical diagnostics, contributing to public safety and informing future legislation on driving under the influence of drugs.
+
