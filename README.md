@@ -8,7 +8,7 @@ As marijuana use becomes increasingly decriminalized across the U.S., addressing
 
 **Data Analysis:** Employed advanced sensitivity/specificity analysis to identify the most relevant biomarkers for distinguishing recent use. Assessed the reliability of each combination of biomarkers, cutoffs, and matrices at various time windows from the study.
 
-**Research Summaries:** Documented findings in a comprehensive report, detailing methodologies, results, and future research directions. Created inforgraphic to summarize findings in an accessible format.
+**Research Summaries:** Documented findings in a comprehensive report, detailing methodologies, results, and future research directions. Created infographic to summarize findings in an accessible format.
 
 ## Tools and Technologies  
 - **Programming:** R
@@ -18,14 +18,9 @@ As marijuana use becomes increasingly decriminalized across the U.S., addressing
 
 ## Objectives  
 1. Analyze various cannabinoids across biological matrices (blood, breath, oral fluid) to determine the most selective biomarkers for detecting recent marijuana use.
-3. Define appropriate cutoff levels for biomarkers that strike the balance between maximizing road safety and minimizing wrongful convictions.
-4. Generate scientifically grounded insights to guide the development of fair laws related to DUIDs.
-
-## Results and Discussion  
-- Identified biomarkers with strong statistical significance in distinguishing recent marijuana use
-- Evaluated the performance of predictive models, achieving notable accuracy and reliability
-- Discussed limitations, including dataset scope and potential confounders, and suggested avenues for further research
+2. Define appropriate cutoff levels for biomarkers that strike the balance between maximizing road safety and minimizing wrongful convictions.
+3. Generate scientifically grounded insights to guide the development of fair laws related to DUIDs.
+4. Discuss limitations, including dataset scope and potential confounders, and suggested avenues for further research
 
 ## Conclusion
-This study provides a comprehensive analysis of biomarkers for recent marijuana use, identifying the most effective compounds and cutoff levels across various biological matrices. By prioritizing selectivity and emphasizing true positive detection, the findings aim to support the development of accurate and scientifically grounded methods for detecting impairment. These insights have practical applications in law enforcement and medical diagnostics, contributing to public safety and informing future legislation on driving under the influence of drugs.
-
+This study provides a comprehensive analysis of biomarkers for recent marijuana use, identifying the most effective compounds and cutoff levels across various biological matrices. By balancing selectivity and sensitivity, the findings aim to support the development of accurate and scientifically grounded methods for detecting impairment. These insights have practical applications in law enforcement and medical diagnostics, contributing to public safety and informing future legislation on DUIDs.
